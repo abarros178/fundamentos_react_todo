@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import {nanoid} from 'nanoid'
+import {firebase} from '../firebase'
 
 const Formulario = () => {
     const [fruta, setFruta] = React.useState('')
@@ -9,7 +10,30 @@ const Formulario = () => {
     const [modoEdicion, setModoEdicion] = React.useState(false)
     const [error, setError] = React.useState(null)
 
-    const guardarFrutas = (e) =>{
+    React.useEffect(()=>{
+         const obtenerDatos= async () =>{
+             try{
+                 const db = firebase.firestore()
+                 const data = await db.collection('fruta').get()
+                 const arrayData= data.docs.map(item => (
+                     {
+                         id: item.id, ... item.data()
+                     }
+                 ))
+                 //console.log(arrayData)
+
+                 setListaFrutas(arrayData)
+
+             }catch(error){
+                 console.log(error)
+             }
+         }
+
+         obtenerDatos();
+    })
+
+
+    const guardarFrutas = async (e) =>{
         e.preventDefault()
 
         if(!fruta.trim()){
@@ -21,20 +45,29 @@ const Formulario = () => {
             setError('Digite la Descripción')
             return
         }
-          const nuevafruta={ id:nanoid(), 
-          nombreFruta: fruta, 
-          nombreDescripcion: descripcion}
 
-        setListaFrutas([
-            ... listaFrutas,nuevafruta
-        ])
+        try{
+            const db = firebase.firestore()
+            const nuevaFruta = {
+                nombreFruta: fruta,
+                nombreDescripcion: descripcion
+            }
+
+            const data = await db.collection('fruta').add(nuevaFruta)
+
+            setListaFrutas([
+                ... listaFrutas,
+                {id:nanoid(), nombreFruta: fruta, nombreDescripcion: descripcion}
+            ])
+
+            e.target.reset()
+            setFruta('')
+            setDescripcion('')
+            setError(null)
+        }catch(error){
+            console.log(error)
+        }
         
-           
-
-        e.target.reset()
-        setFruta('')
-        setDescripcion('')
-        setError(null)
     }
 
     const editar = item =>{
@@ -44,7 +77,7 @@ const Formulario = () => {
         setId(item.id)
     }
 
-    const editarFrutas = e =>{
+    const editarFrutas = async e =>{
         e.preventDefault()
 
         if(!fruta.trim()){
@@ -57,21 +90,42 @@ const Formulario = () => {
              return
          }
 
-        const arrayEditado = listaFrutas.map(
-            item => item.id ===id ? {id:id, nombreFruta:fruta, nombreDescripcion: descripcion}: item
-        )
+         try{
+             const db = firebase.firestore()
+             await db.collection('fruta').doc(id).update({
+                 nombreFruta:fruta,
+                 nombreDescripcion:descripcion
+             })
+        
+             const arrayEditado = listaFrutas.map(
+                item => item.id ===id ? {id:id, nombreFruta:fruta, nombreDescripcion: descripcion}: item
+            )
+    
+            setListaFrutas(arrayEditado)
+            setFruta('')
+            setDescripcion('')
+            setId('')
+            setModoEdicion(false)
+            setError(null)
 
-        setListaFrutas(arrayEditado)
-        setFruta('')
-        setDescripcion('')
-        setId('')
-        setModoEdicion(false)
-        setError(null)
+         }catch(error){
+             console.log(error)
+         }
+
+        
     } 
 
-    const eliminar = id =>{
-        const aux = listaFrutas.filter(item => item.id !== id)
-        setListaFrutas(aux)
+    const eliminar = async id =>{
+        try{
+            const db = firebase.firestore()
+            await db.collection('fruta').doc(id).delete()
+            const aux = listaFrutas.filter(item => item.id !== id)
+            setListaFrutas(aux)
+        }catch(error){
+            console.log(error)
+        }
+
+        
     }
 
     const cancelar = () =>{
@@ -145,6 +199,7 @@ const Formulario = () => {
                             </>
                         )
                         :
+
                             <button 
                             className='btn btn-primary btn-block'
                             type='submit'
